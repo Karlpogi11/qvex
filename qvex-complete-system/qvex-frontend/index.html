@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qvex - Mobilecare Queue Management</title>
+    <script src="/epson/epos-2.27.0.js"></script>
+
+
+
+
+
+  
+  <!-- Apple SF Pro Font Loading -->
+  <style>
+    @font-face {
+      font-family: 'SF Pro Display';
+      src: local('SF Pro Display'), local('-apple-system'), local('BlinkMacSystemFont');
+      font-weight: 100 900;
+      font-style: normal;
+    }
+    
+    @font-face {
+      font-family: 'SF Pro Text';
+      src: local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont');
+      font-weight: 100 900;
+      font-style: normal;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    #root {
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="module" src="/src/main.jsx"></script>
+  
+</body>
+</html>

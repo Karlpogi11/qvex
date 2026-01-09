@@ -1,0 +1,188 @@
+.container {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 2rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 3rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.backBtn:hover {
+  background: var(--surface-hover);
+}
+
+.header h1 {
+  font-size: 2rem;
+  color: var(--text-primary);
+}
+
+.content {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.section {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 2rem;
+}
+
+.section h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+}
+
+.themeToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.themeToggle button {
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.themeToggle button.active {
+  background: var(--electric-blue);
+  color: white;
+}
+
+.addForm {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.addForm input {
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all var(--transition-fast);
+}
+
+.addForm input:focus {
+  border-color: var(--electric-blue);
+  outline: none;
+}
+
+.addForm button {
+  padding: 0.75rem 1.5rem;
+  background: var(--electric-blue);
+  color: white;
+  border-radius: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-base);
+}
+
+.addForm button:hover {
+  background: var(--electric-blue-light);
+}
+
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  transition: all var(--transition-fast);
+}
+
+.item:hover {
+  border-color: var(--electric-blue);
+}
+
+.item div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.item strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.item span {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.item button {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--danger);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.item button:hover {
+  background: var(--danger-light);
+}
+
+.saveBtn {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--success);
+  color: white;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all var(--transition-base);
+}
+
+.saveBtn:hover {
+  background: var(--success-light);
+}

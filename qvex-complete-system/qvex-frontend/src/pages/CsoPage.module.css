@@ -1,0 +1,270 @@
+.container {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 2rem;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 12px;
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.backBtn:hover {
+  background: var(--surface-hover);
+}
+
+.counterInfo h1 {
+  font-size: 2rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.counterInfo p {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+}
+
+.datetime {
+  text-align: right;
+}
+
+.time {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--electric-blue);
+  font-variant-numeric: tabular-nums;
+}
+
+.date {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.mainContent {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.currentSection h2,
+.callSection h3 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+}
+
+.currentCard {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 3rem;
+  text-align: center;
+  border: 2px solid var(--electric-blue);
+}
+
+.queueNumberLarge {
+  font-size: 6rem;
+  font-weight: 700;
+  color: var(--electric-blue);
+  margin-bottom: 1.5rem;
+}
+
+.serviceInfo {
+  margin-bottom: 2rem;
+}
+
+.serviceType {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.customerType {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: var(--bg-tertiary);
+  border-radius: 16px;
+  margin-bottom: 2rem;
+}
+
+.duration {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--warning);
+  font-variant-numeric: tabular-nums;
+}
+
+.completeBtn {
+  width: 100%;
+  padding: 1.25rem;
+  background: var(--success);
+  color: white;
+  border-radius: 16px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  transition: all var(--transition-base);
+}
+
+.completeBtn:hover {
+  background: var(--success-light);
+  transform: translateY(-2px);
+}
+
+.noService {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 4rem 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  border: 2px dashed var(--border-color);
+}
+
+.noService p {
+  font-size: 1.25rem;
+  margin-top: 1rem;
+}
+
+.hint {
+  font-size: 1rem !important;
+  color: var(--text-disabled) !important;
+}
+
+.callSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.typeSelector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.typeSelector button {
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.typeSelector button.active {
+  background: var(--electric-blue);
+  color: white;
+}
+
+.callNextBtn {
+  width: 100%;
+  padding: 1.5rem;
+  background: var(--electric-blue);
+  color: white;
+  border-radius: 16px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all var(--transition-base);
+}
+
+.callNextBtn:not(:disabled):hover {
+  background: var(--electric-blue-light);
+  transform: translateY(-2px);
+}
+
+.callNextBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.queuePreview {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.previewList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.previewItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+}
+
+.previewNumber {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--electric-blue);
+  min-width: 60px;
+}
+
+.previewService {
+  color: var(--text-secondary);
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+.emptyQueue {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+@media (max-width: 1024px) {
+  .mainContent {
+    grid-template-columns: 1fr;
+  }
+}
