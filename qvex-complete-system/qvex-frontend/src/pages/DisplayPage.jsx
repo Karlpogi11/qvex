@@ -27,9 +27,9 @@ const DisplayPage = () => {
 
     // 📥 Load CSOs
     const loadCsos = async () => {
-      const data = await csoApi.getAll();
+     const data = await csoApi.getAll();
       try {
-        const data = await csoApi.getAll();
+        
         setCsos(
           data.map(cso => ({
             ...cso,
@@ -44,32 +44,26 @@ const DisplayPage = () => {
     loadCsos();
 
     //  Listen to queue events
-    socket.on('queue_event', (data) => {
-  console.log('Queue event:', data);
-
-  setHighlightedCounter(data.counter_number);
-  setTimeout(() => setHighlightedCounter(null), 3000);
-
-  // Update the affected CSO only
-  setCsos((prevCsos) =>
-    prevCsos.map((cso) => {
+   socket.on('queue_event', (data) => {
+  setCsos(prevCsos =>
+    prevCsos.map(cso => {
+      // Only update the CSO that matches
       if (cso.counter_number === data.counter_number) {
-        // Update current_queue for this CSO
         if (data.type === 'customer_called') {
           return {
             ...cso,
-            current_queue: {
-              queue_number: data.queue_number,
-              queue_type: data.queue_type,
-            },
+          current_queue: data.type === 'customer_called' ? { queue_number: data.queue_number, queue_type: data.queue_type } : null
+      
           };
-        } else if (data.type === 'service_completed') {
+        }
+        if (data.type === 'service_completed') {
           return {
             ...cso,
             current_queue: null,
           };
         }
       }
+      // Leave others untouched
       return cso;
     })
   );

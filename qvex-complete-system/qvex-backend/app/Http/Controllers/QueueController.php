@@ -9,6 +9,7 @@ use App\Events\QueueCalled;
 use App\Events\QueueCancelled;
 use App\Events\ServiceCompleted;
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Http;
 // use Illuminate\Support\Facades\DB;
 // use App\Models\CsoStaff; //  REQUIRED
 
@@ -138,34 +139,46 @@ class QueueController extends Controller
     }
 
     // Call next queue
- public function callNext(Request $request)
+public function callNext(Request $request)
 {
     $request->validate([
         'csoId' => 'required|exists:cso_staff,id',
         'customerType' => 'required|in:walk-in,appointment',
     ]);
 
-    $csoId = $request->csoId;
-    $customerType = $request->customerType;
-
-    // 1️⃣ Get the CSO
-    $cso = CSO::findOrFail($csoId);
+    $cso = CSO::findOrFail($request->csoId);
 
     try {
-        // 2️⃣ Check if CSO already has a current queue
+        /**
+         * 1️⃣ If CSO is already serving, COMPLETE it first
+         */
         if ($cso->current_queue_id) {
-            $currentQueue = Queue::find($cso->current_queue_id);
-            if ($currentQueue && $currentQueue->status === 'serving') {
-                return response()->json([
-                    'message' => 'CSO is already serving a customer',
-                    'queue' => $currentQueue,
-                ], 200);
+            $currentQueue = Queue::where('id', $cso->current_queue_id)
+                ->where('status', 'serving')
+                ->first();
+
+            if ($currentQueue) {
+                $currentQueue->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                ]);
+
+                // Clear CSO
+                $cso->update(['current_queue_id' => null]);
+
+                // Notify display (remove serving)
+                Http::post('http://localhost:3001/event', [
+                    'type' => 'service_completed',
+                    'counter_number' => $cso->counter_number,
+                ]);
             }
         }
 
-        // 3️⃣ Get next waiting queue
+        /**
+         * 2️⃣ Get next waiting queue
+         */
         $nextQueue = Queue::where('status', 'waiting')
-            ->where('queue_type', $customerType)
+            ->where('queue_type', $request->customerType)
             ->orderBy('created_at')
             ->first();
 
@@ -175,28 +188,42 @@ class QueueController extends Controller
             ], 200);
         }
 
-        // 4️⃣ Assign queue to CSO
-        $nextQueue->status = 'serving';
-        $nextQueue->cso_id = $csoId;
-       // $nextQueue->started_at = now();
-        $nextQueue->save();
+        /**
+         * 3️⃣ Assign new queue to CSO
+         */
+        $nextQueue->update([
+            'status' => 'serving',
+            'cso_id' => $cso->id,
+            'called_at' => now(),
+        ]);
 
-        // 5️⃣ Update CSO's current_queue_id
-        $cso->current_queue_id = $nextQueue->id;
-        $cso->save();
+        $cso->update([
+            'current_queue_id' => $nextQueue->id,
+        ]);
+
+        /**
+         * 4️⃣ Notify display (show new serving)
+         */
+        Http::post('http://localhost:3001/event', [
+            'type' => 'customer_called',
+            'counter_number' => $cso->counter_number,
+            'queue_number' => $nextQueue->queue_number,
+            'queue_type' => $nextQueue->queue_type,
+        ]);
 
         return response()->json([
             'message' => 'Next customer called',
             'queue' => $nextQueue,
         ], 200);
 
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         return response()->json([
             'message' => 'Failed to call next customer',
-            'error' => $e->getMessage()
+            'error' => $e->getMessage(),
         ], 500);
     }
 }
+
 
 
 
@@ -208,25 +235,36 @@ class QueueController extends Controller
         'duration' => 'required|integer|min:0',
     ]);
 
-    $queue = Queue::findOrFail($id);
+    $queue = Queue::with('cso')->findOrFail($id);
+
+    // 1️⃣ Mark queue completed
     $queue->update([
         'status' => 'completed',
         'completed_at' => now(),
         'service_duration' => $validated['duration'],
     ]);
 
-    // Broadcast completion to Node.js
+    // 2️⃣ CLEAR CSO CURRENT QUEUE
+    if ($queue->cso) {
+        $queue->cso->update([
+            'current_queue_id' => null,
+        ]);
+    }
+
+    // 3️⃣ Notify display
     try {
         Http::post('http://localhost:3001/event', [
             'type' => 'service_completed',
-            'queue_number' => $queue->queue_number,
             'counter_number' => optional($queue->cso)->counter_number,
         ]);
     } catch (\Throwable $e) {
         \Log::error('Failed to send completion event: ' . $e->getMessage());
     }
 
-    return response()->json($queue);
+    return response()->json([
+        'message' => 'Service completed',
+        'queue' => $queue,
+    ]);
 }
 
 
