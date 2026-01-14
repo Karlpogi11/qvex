@@ -102,8 +102,8 @@ const handleSaveSettings = async () => {
 
 
       <div className={styles.content}>
-        {/* Theme Settings */}
-        <div className={styles.section}>
+        Theme Settings
+        {/* <div className={styles.section}>
           <h2>Appearance</h2>
           <div className={styles.themeToggle}>
             <button
@@ -119,13 +119,10 @@ const handleSaveSettings = async () => {
               Light Mode
             </button>
 
-
-            
+         
           </div>
 
-
-          
-        </div>
+        </div> */}
 
       <button 
         className={styles.statsBtn}

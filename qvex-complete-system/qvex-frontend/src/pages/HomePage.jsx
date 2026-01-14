@@ -85,7 +85,7 @@ const HomePage = () => {
           exit={{ opacity: 0, x: 50 }}
         >
           <h3>Settings</h3>
-          <div className={styles.settingItem}>
+          {/* <div className={styles.settingItem}>
             <label>Theme</label>
             <div className={styles.themeToggle}>
               <button
@@ -101,7 +101,7 @@ const HomePage = () => {
                 Light
               </button>
             </div>
-          </div>
+          </div> */}
           <button
             className={styles.adminBtn}
             onClick={() => navigate('/admin')}
