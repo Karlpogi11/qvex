@@ -46,49 +46,50 @@ const ReceptionPage = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!serviceType) {
-      addNotification({ type: 'error', message: 'Please select a service type' });
-      return;
+  if (!serviceType) {
+    addNotification({ type: 'error', message: 'Please select a service type' });
+    return;
+  }
+
+  try {
+    const queueNumber =
+      customerType === 'walk-in' && manualQueueNumber
+        ? manualQueueNumber
+        : generateQueueNumber();
+
+    const queueType = customerType.toLowerCase();
+
+    const newQueue = await queueApi.create({
+      queue_number: queueNumber,
+      queue_type: queueType,
+      service_type: serviceType,
+      status: 'waiting',
+    });
+
+    addQueue(newQueue);
+    addNotification({ type: 'success', message: `Queue ${newQueue.queue_number} added` });
+
+    setShowForm(false);
+    setServiceType('');
+    setManualQueueNumber('');
+  } catch (error) {
+    console.error('Queue creation error:', error.response?.data);
+    
+    // ✅ Handle specific error for active queue numbers
+    const errorData = error.response?.data;
+    let errorMessage = 'Failed to create queue';
+    
+    if (errorData?.error === 'QUEUE_NUMBER_ACTIVE') {
+      errorMessage = 'This queue number is currently active. Please use a different number.';
+    } else if (errorData?.message) {
+      errorMessage = errorData.message;
     }
-
-    try {
-      const queueNumber =
-        customerType === 'walk-in' && manualQueueNumber
-          ? manualQueueNumber
-          : generateQueueNumber();
-
-      const queueType = customerType.toLowerCase();
-
-      const newQueue = await queueApi.create({
-        queue_number: queueNumber,
-        queue_type: queueType,
-        service_type: serviceType,
-        status: 'waiting',
-      });
-
-      addQueue(newQueue); // update UI
-      addNotification({ type: 'success', message: `Queue ${newQueue.queue_number} added` });
-
-      // Optional printer logic
-      // try {
-      //   printQueueNumber(newQueue.queue_number);
-      // } catch (err) {
-      //   console.error('Printing error:', err);
-      // }
-
-      setShowForm(false);
-      setServiceType('');
-      setManualQueueNumber('');
-    } catch (error) {
-      console.error('Queue creation error:', error.response?.data);
-      addNotification({
-        type: 'error',
-        message: error.response?.data?.message || 'Failed to create queue',
-      });
-    }
-  };
+    
+    addNotification({ type: 'error', message: errorMessage });
+  }
+};
 
   const handleCancel = async (queueId) => {
     if (!window.confirm('Are you sure you want to cancel this queue?')) return;

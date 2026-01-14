@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -34,5 +35,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+
+    'socket' => [
+       'url' => env('SOCKET_SERVER_URL', 'http://localhost:3001/event'),
+   ],
 
 ];

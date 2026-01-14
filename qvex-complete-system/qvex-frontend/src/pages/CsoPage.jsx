@@ -1,25 +1,27 @@
+// CsoPage.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, PhoneCall, CheckCircle, Clock, User, NotebookTabsIcon } from 'lucide-react';
+import { ArrowLeft, PhoneCall, CheckCircle, Clock, User } from 'lucide-react';
 import { useAppStore, useCsoStore } from '../store';
 import { queueApi, csoApi } from '../services/api';
 import { format } from 'date-fns';
-import { io } from 'socket.io-client';
 import styles from './CsoPage.module.css';
 
-//working
 const CsoPage = () => {
+  // ====== Hooks ======
   const { csoId } = useParams();
+  const csoIdNum = Number(csoId);
   const navigate = useNavigate();
   const { addNotification } = useAppStore();
+
   const {
-    currentQueue,
-    serviceStartTime,
-    serviceDuration,
+  
     startService,
     updateDuration,
     completeService,
+    getCurrentQueue,
+    getServiceDuration,
   } = useCsoStore();
 
   const [csoInfo, setCsoInfo] = useState(null);
@@ -28,139 +30,113 @@ const CsoPage = () => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [selectedType, setSelectedType] = useState('walk-in');
 
-  // ---------------------------
-  // Fetch CSO info and current serving queue
-const loadCsoInfo = async () => {
-  try {
-    const data = await csoApi.getById(csoId);
-    setCsoInfo(data);
+  const currentQueue = getCurrentQueue(csoIdNum);
 
-    // ✅ Get current serving queue
-    const queue = await queueApi.getCurrent(csoId);
-    if (queue && queue.status === 'serving') {
-      startService(queue); // set currentQueue in store
+  // ====== useEffect: Load CSO info & recover queue ======
+useEffect(() => {
+  let isMounted = true;
+
+  const load = async () => {
+    try {
+      //  Load CSO info (required)
+      const csoData = await csoApi.getById(csoIdNum);
+      if (!isMounted) return;
+      setCsoInfo(csoData);
+
+      // 2️ ALWAYS trust backend for current serving
+      const queue = await queueApi.getCurrent(csoIdNum);
+
+      if (queue && queue.status === 'serving') {
+        const elapsedSeconds = queue.called_at
+  ? Math.floor((Date.now() - new Date(queue.called_at).getTime()) / 1000)
+  : 0;
+
+startService(csoIdNum, queue, elapsedSeconds); // pass elapsed time to store
+
+      }
+
+      // 3️⃣ Load counts (waiting / appointment)
+      await loadQueues();
+    } catch (err) {
+      console.error('Failed to load CSO info', err);
     }
-  } catch (error) {
-    console.error(error);
-  }
-};
+  };
+
+  load();
+
+  // ⏱ Duration updater (safe even if no queue)
+  const durationTimer = setInterval(() => {
+    updateDuration(csoIdNum);
+  }, 1000);
+
+  // 🕒 Clock
+  const clockTimer = setInterval(() => {
+    setCurrentDateTime(new Date());
+  }, 1000);
+
+  return () => {
+    isMounted = false;
+    clearInterval(durationTimer);
+    clearInterval(clockTimer);
+  };
+}, [csoIdNum]);
 
 
-
-  // Fetch waiting and appointment queues
+  // ====== loadQueues: fetch waiting and appointment queues ======
   const loadQueues = async () => {
     try {
       const waiting = await queueApi.getWaiting();
       const appts = await queueApi.getByAppointment();
 
-      setWaitingQueues(waiting.filter(q => q.queue_type === 'walk-in'));
-      setAppointments(appts.filter(q => q.queue_type === 'appointment'));
-    } catch (error) {
-      console.error('Failed to load queues:', error);
+      setWaitingQueues(waiting.filter((q) => q.queue_type === 'walk-in'));
+      setAppointments(appts.filter((q) => q.queue_type === 'appointment'));
+    } catch (err) {
+      console.error('Failed to load queues', err);
     }
   };
 
-  // ---------------------------
-  // Socket.IO: Listen for queue events in real-time
-  useEffect(() => {
-    // only connect socket after csoInfo is loaded
-    if (!csoInfo) return;
+  // ====== handleCallNext ======
+  const handleCallNext = async () => {
+    try {
+      const queue = await queueApi.callNext({
+        csoId: csoIdNum,
+        customerType: selectedType,
+      });
 
-    const socket = io('http://localhost:3001', {
-      transports: ['websocket'],
-      reconnection: true,
-    });
-
-    socket.on('connect', () => console.log('🟢 CSO page connected:', socket.id));
-    socket.on('disconnect', () => console.log('🔴 CSO page disconnected'));
-
-    socket.on('queue_event', (data) => {
-      if (data.counter_number === csoInfo.counter_number) {
-        if (data.type === 'customer_called') {
-          startService({
-            id: data.queue_id,
-            queue_number: data.queue_number,
-            queue_type: data.queue_type,
-            service_type: data.service_type,
-            status: 'serving',
-          });
-        } else if (data.type === 'service_completed') {
-          completeService();
-        }
+      if (queue) {
+        startService(csoIdNum, queue); // assign queue per-CSO
+        await loadQueues(); // update counts
       }
-      loadQueues(); // refresh UI queues
-    });
 
-    return () => socket.disconnect();
-  }, [csoInfo]); // only re-run if csoInfo changes
+      addNotification({
+        type: 'success',
+        message: `Called ${queue.queue_number}`,
+      });
+    } catch (error) {
+      addNotification({
+        type: 'error',
+        message: error.response?.data?.message || 'No customers in queue',
+      });
+    }
+  };
 
-  // ---------------------------
-  // Main useEffect for initial load & timers
-  useEffect(() => {
-    loadCsoInfo();
-    loadQueues();
-
-    const timer = setInterval(() => {
-      setCurrentDateTime(new Date());
-      if (serviceStartTime) updateDuration();
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [csoId, serviceStartTime]);
-
-  // ---------------------------
-  // Call next customer
- const handleCallNext = async () => {
-  try {
-    const res = await queueApi.callNext({
-      csoId: Number(csoId),
-      customerType: selectedType,
-    });
-
-    if (!res.queue) throw new Error('No queue returned from backend');
-
-    startService(res.queue); // ✅ this sets currentQueue correctly
-
-    await csoApi.updateStatus(csoId, { current_queue_id: res.queue.id });
-
-    addNotification({
-      type: 'success',
-      message: `Called ${res.queue.queue_number}`,
-    });
-
-    loadQueues();
-  } catch (error) {
-    console.error(error.response?.data || error.message);
-    addNotification({
-      type: 'error',
-      message: error.response?.data?.message || 'No customers in queue',
-    });
-  }
-};
-
-
-
-  // ---------------------------
-  // Complete current service
+  // ====== handleComplete ======
   const handleComplete = async () => {
-  if (!currentQueue?.id) {
-    console.warn('No current queue to complete');
-    return;
-  }
+  if (!currentQueue) return;
 
   try {
-    await queueApi.complete(currentQueue.id, serviceDuration);
-    await csoApi.updateStatus(csoId, { current_queue_id: null });
+    const duration = getServiceDuration(csoIdNum) || 0; // ✅ get per-CSO duration
+    await queueApi.complete(currentQueue.id, duration);
+    await csoApi.updateStatus(csoIdNum, { current_queue_id: null });
+
+    completeService(csoIdNum); // reset per-CSO
+    await loadQueues();
 
     addNotification({
       type: 'success',
       message: `Service completed for ${currentQueue.queue_number}`,
     });
-
-    completeService(); // resets currentQueue
-    loadQueues();
-  } catch (error) {
-    console.error(error.response?.data || error.message);
+  } catch (err) {
     addNotification({
       type: 'error',
       message: 'Failed to complete service',
@@ -168,6 +144,9 @@ const loadCsoInfo = async () => {
   }
 };
 
+
+
+  // ====== formatDuration helper ======
   const formatDuration = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -178,7 +157,7 @@ const loadCsoInfo = async () => {
     return <div className={styles.loading}>Loading...</div>;
   }
 
-  // ---------------------------
+  // ====== Render ======
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -198,7 +177,7 @@ const loadCsoInfo = async () => {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
-        {/* Current Service */}
+        {/* Current Service Section */}
         <div className={styles.currentSection}>
           <h2>Current Service</h2>
           {currentQueue ? (
@@ -212,7 +191,7 @@ const loadCsoInfo = async () => {
               </div>
               <div className={styles.timer}>
                 <Clock size={32} />
-                <div className={styles.duration}>{formatDuration(serviceDuration)}</div>
+                <div className={styles.duration}>{formatDuration(getServiceDuration(csoIdNum))}</div>
               </div>
               <motion.button
                 className={styles.completeBtn}
@@ -220,7 +199,8 @@ const loadCsoInfo = async () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <CheckCircle size={24} /> Complete Service
+                <CheckCircle size={24} />
+                Complete Service
               </motion.button>
             </motion.div>
           ) : (
@@ -252,11 +232,12 @@ const loadCsoInfo = async () => {
           <motion.button
             className={styles.callNextBtn}
             onClick={handleCallNext}
-            disabled={!!currentQueue|| !csoInfo }
+            disabled={!!currentQueue}
             whileHover={!currentQueue ? { scale: 1.02 } : {}}
             whileTap={!currentQueue ? { scale: 0.98 } : {}}
           >
-            <PhoneCall size={32} /> Call Next Customer
+            <PhoneCall size={32} />
+            Call Next Customer
           </motion.button>
 
           {/* Queue Preview */}

@@ -7,30 +7,29 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    transports: ['websocket', 'polling'],
-  },
+    origin: 'http://192.168.1.111:5173', // allow all origins for testing; replace with your React URL in production
+    methods: ['GET', 'POST']
+  }
 });
 
+// Parse JSON body
 app.use(express.json());
 
-// 🔁 Laravel → Node → Display
+// Endpoint Laravel will POST to
 app.post('/event', (req, res) => {
-  const payload = req.body;
+  const data = req.body;
+  console.log('✅ Event received from Laravel:', data);
 
-  if (!payload || !payload.type) {
-    return res.status(400).json({ error: 'Invalid event payload' });
-  }
+  // Emit to all connected clients
+  io.emit('queue_event', data);
 
-  console.log('✅ Event received from Laravel:', payload);
-
-  io.emit('queue_event', payload);
+  // Optional: log confirmation in console
+  console.log(`➡ Broadcasted event to clients: ${data.type} - Queue: ${data.queue_number}`);
 
   res.json({ status: 'ok' });
 });
 
-// 🔌 socket lifecycle
+// Socket.io connection listener
 io.on('connection', (socket) => {
   console.log('🟢 Client connected:', socket.id);
 
@@ -39,6 +38,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3001, '0.0.0.0', () => {
+// Start server
+server.listen(3001, () => {
   console.log('⚡ Socket.io server running on port 3001');
 });

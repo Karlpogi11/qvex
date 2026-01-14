@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { settingsApi } from '../services/api';
 
 // Main app store
 export const useAppStore = create((set, get) => ({
@@ -10,12 +11,34 @@ export const useAppStore = create((set, get) => ({
     set({ theme });
   },
 
-  // Settings
+  // Settings - ✅ REMOVED hardcoded values
   settings: {
-    serviceTypes: ['Screen Repair', 'Battery Replacement', 'Water Damage', 'Software Issue', 'General Checkup', 'Other'],
+    serviceTypes: [], // Will be loaded from backend
     csos: [],
   },
   updateSettings: (settings) => set({ settings: { ...get().settings, ...settings } }),
+
+  // ✅ NEW: Load settings from backend
+  loadSettings: async () => {
+    try {
+      const serviceTypes = await settingsApi.getServiceTypes();
+      set((state) => ({
+        settings: {
+          ...state.settings,
+          serviceTypes: serviceTypes || [],
+        }
+      }));
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      // Fallback to defaults if API fails
+      set((state) => ({
+        settings: {
+          ...state.settings,
+          serviceTypes: ['Repair', 'Courtesy', 'Releasing', 'Payment', 'Other'],
+        }
+      }));
+    }
+  },
 
   // Queue Management
   queues: [],
@@ -58,30 +81,47 @@ export const useAppStore = create((set, get) => ({
 
 // CSO specific store
 export const useCsoStore = create((set, get) => ({
-  currentQueue: null,
-  serviceStartTime: null,
-  serviceDuration: 0,
-  
-  startService: (queue) => {
-    set({
-      currentQueue: queue,
-      serviceStartTime: Date.now(),
-      serviceDuration: 0,
-    });
+  queuesByCso: {},
+  serviceDurationByCso: {},
+  serviceStartTimeByCso: {},
+
+  startService: (csoId, queue, elapsedSeconds = 0) => {
+    const now = Date.now();
+    const startTime = now - elapsedSeconds * 1000;
+    set((state) => ({
+      queuesByCso: { ...state.queuesByCso, [csoId]: queue },
+      serviceDurationByCso: { ...state.serviceDurationByCso, [csoId]: elapsedSeconds },
+      serviceStartTimeByCso: { ...state.serviceStartTimeByCso, [csoId]: startTime },
+    }));
   },
 
-  updateDuration: () => {
-    const { serviceStartTime } = get();
-    if (serviceStartTime) {
-      set({ serviceDuration: Math.floor((Date.now() - serviceStartTime) / 1000) });
+  updateDuration: (csoId) => {
+    const start = get().serviceStartTimeByCso?.[csoId];
+    if (start) {
+      const duration = Math.floor((Date.now() - start) / 1000);
+      set((state) => ({
+        serviceDurationByCso: { ...state.serviceDurationByCso, [csoId]: duration },
+      }));
     }
   },
 
-  completeService: () => {
-    set({
-      currentQueue: null,
-      serviceStartTime: null,
-      serviceDuration: 0,
+  getCurrentQueue: (csoId) => get().queuesByCso?.[csoId] || null,
+
+  getServiceDuration: (csoId) => get().serviceDurationByCso?.[csoId] || 0,
+
+  completeService: (csoId) => {
+    set((state) => {
+      const queues = { ...state.queuesByCso };
+      const durations = { ...state.serviceDurationByCso };
+      const startTimes = { ...state.serviceStartTimeByCso };
+      delete queues[csoId];
+      delete durations[csoId];
+      delete startTimes[csoId];
+      return {
+        queuesByCso: queues,
+        serviceDurationByCso: durations,
+        serviceStartTimeByCso: startTimes,
+      };
     });
   },
 }));

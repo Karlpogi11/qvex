@@ -14,11 +14,13 @@ import './styles/global.css';
 //initPrinter(); // init once on app start
 
 function App() {
-  const { theme, setTheme } = useAppStore();
+  const { theme, setTheme ,loadSettings} = useAppStore();
 
   useEffect(() => {
     // Initialize theme
+    
     document.documentElement.setAttribute('data-theme', theme);
+     loadSettings();
   }, [theme]);
 
   return (

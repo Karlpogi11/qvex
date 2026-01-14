@@ -83,19 +83,6 @@ $csos = $csos->map(function($cso) {
         return response()->json($cso, 201);
     }
 
-    // public function updatestatus(Request $request, $id)
-    // {
-    //     $cso = CSO::findOrFail($id);
-
-    //     $validated = $request->validate([
-    //         'name' => 'sometimes|string|unique:cso_staff,name,' . $id,
-    //         'counter_number' => 'sometimes|integer',
-    //         'is_active' => 'sometimes|boolean',
-    //     ]);
-
-    //     $cso->update($validated);
-    //     return response()->json($cso);
-    // }
 
 
       public function getCurrent($csoId)

@@ -2,54 +2,42 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Setting;
 use App\Models\ServiceType;
 use Illuminate\Http\Request;
 
 class SettingsController extends Controller
 {
-    public function index()
-    {
-        return Setting::all();
-    }
-
-    public function update(Request $request, $key)
-    {
-        $validated = $request->validate([
-            'value' => 'required',
-        ]);
-
-        $setting = Setting::updateOrCreate(
-            ['key' => $key],
-            ['value' => $validated['value']]
-        );
-
-        return response()->json($setting);
-    }
-
     public function getServiceTypes()
     {
-        return ServiceType::where('is_active', true)->pluck('name');
+        $serviceTypes = ServiceType::where('is_active', true)
+            ->pluck('name')
+            ->toArray();
+        
+        // Return array of names for frontend
+        return response()->json($serviceTypes);
     }
 
     public function updateServiceTypes(Request $request)
     {
         $validated = $request->validate([
-            'types' => 'required|array',
-            'types.*' => 'string',
+            'service_types' => 'required|array',
+            'service_types.*' => 'required|string',
         ]);
 
-        // Deactivate all
-        ServiceType::query()->update(['is_active' => false]);
+        // Delete all existing service types
+        ServiceType::query()->delete();
 
-        // Add or reactivate types
-        foreach ($validated['types'] as $typeName) {
-            ServiceType::updateOrCreate(
-                ['name' => $typeName],
-                ['is_active' => true]
-            );
+        // Create new ones
+        foreach ($validated['service_types'] as $typeName) {
+            ServiceType::create([
+                'name' => $typeName,
+                'is_active' => true,
+            ]);
         }
 
-        return response()->json(['message' => 'Service types updated successfully']);
+        return response()->json([
+            'message' => 'Service types updated successfully',
+            'service_types' => $validated['service_types']
+        ]);
     }
 }

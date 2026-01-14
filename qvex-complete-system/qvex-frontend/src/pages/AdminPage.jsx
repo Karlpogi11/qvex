@@ -66,15 +66,20 @@ const AdminPage = () => {
     setServiceTypes(serviceTypes.filter(t => t !== type));
   };
 
-  const handleSaveSettings = async () => {
-    try {
-      await settingsApi.updateServiceTypes(serviceTypes);
-      updateSettings({ serviceTypes });
-      addNotification({ type: 'success', message: 'Settings saved successfully' });
-    } catch (error) {
-      addNotification({ type: 'error', message: 'Failed to save settings' });
-    }
-  };
+const handleSaveSettings = async () => {
+  try {
+    await settingsApi.updateServiceTypes(serviceTypes);
+    updateSettings({ serviceTypes });
+    
+    // ✅ Reload settings from backend to confirm save
+    await useAppStore.getState().loadSettings();
+    
+    addNotification({ type: 'success', message: 'Settings saved successfully' });
+  } catch (error) {
+    console.error('Save error:', error);
+    addNotification({ type: 'error', message: 'Failed to save settings' });
+  }
+};
 
   return (
     <div className={styles.container}>

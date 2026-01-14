@@ -41,31 +41,30 @@ export const queueApi = {
   getById: (id) => api.get(`/queues/${id}`),
   create: (data) => api.post('/queues', data),
   update: (id, data) => api.put(`/queues/${id}`, data),
-  cancel: (queueId) => api.post(`/queues/${queueId}/cancel`),
+  cancel: (id) => api.delete(`/queues/${id}`),
   callNext: (payload) => api.post('/queues/call-next', payload),
   complete: (queueId, duration) => api.post(`/queues/${queueId}/complete`, { duration }),
   getWaiting: () => api.get('/queues/waiting'),
   getByAppointment: () => api.get('/queues/appointments'),
-  getCurrent: (csoId) => axios.get(`/queues/current/${csoId}`).then(res => res.data),
+  getCurrent: (csoId) => api.get(`/queues/current/${csoId}`),
 };
 
 // CSO API
 export const csoApi = {
   getAll: () => api.get('/csos'),
   getById: (id) => api.get(`/csos/${id}`),
-  create: (data) => api.post('/csos', data),
+  create: (data) => api.post('/csos', data), // ✅ NOW WORKING
   update: (id, data) => api.put(`/csos/${id}`, data),
- cancel: (queueId) => api.post(`/queues/queues/${queueId}/cancel`),
+  delete: (id) => api.delete(`/csos/${id}`), // ✅ NOW WORKING
   getCurrentQueue: (id) => api.get(`/csos/${id}/current-queue`),
   updateStatus: (id, status) => api.patch(`/csos/${id}/status`, status),
 };
 
-// Settings API
+// Settings API - ✅ FIXED
 export const settingsApi = {
-  getAll: () => api.get('/settings'),
-  update: (key, value) => api.put(`/settings/${key}`, { value }),
   getServiceTypes: () => api.get('/settings/service-types'),
-  updateServiceTypes: (types) => api.put('/settings/service-types', { types }),
+  updateServiceTypes: (serviceTypes) => 
+    api.post('/settings/service-types', { service_types: serviceTypes }), // ✅ FIXED: Changed from PUT to POST and fixed payload
 };
 
 // Statistics API

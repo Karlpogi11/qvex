@@ -5,89 +5,89 @@ namespace App\Http\Controllers;
 use App\Models\Queue;
 use App\Models\CSO;
 use Illuminate\Http\Request;
-use App\Events\QueueCalled;
-use App\Events\QueueCancelled;
-use App\Events\ServiceCompleted;
-use GuzzleHttp\Client;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-// use Illuminate\Support\Facades\DB;
-// use App\Models\CsoStaff; //  REQUIRED
-
-//working
-
-
+use GuzzleHttp\Client;
 
 class QueueController extends Controller
 {
-    // List all queues
     public function index()
     {
-
-        //chages here
-      $csos = CSO::with(['queues' => function($q) {
-        $q->where('status', 'serving')->whereNull('completed_at');
-    }])->get();
-
-    // map first active queue to `current_queue`
-    return $csos->map(function($cso) {
-        $cso->current_queue = $cso->queues->first() ?? null;
-        unset($cso->queues);
-        return $cso;
-    });
-
+        $csos = CSO::with('current_queue')->where('is_active', true)->get();
+        return response()->json($csos);
     }
 
-    // Show specific queue
     public function show($id)
     {
-        return Queue::with('cso')->findOrFail($id);
+        //return Queue::with('cso')->findOrFail($id);
     }
 
-    // Create new queue
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'queue_type' => 'required|in:walk-in,appointment',
-            'service_type' => 'required|string',
-            'queue_number' => 'nullable|string',
-        ]);
+   public function store(Request $request)
+{
+    $validated = $request->validate([
+        'queue_type' => 'required|in:walk-in,appointment',
+        'service_type' => 'required|string',
+        'queue_number' => 'nullable|string',
+    ]);
 
-        if ($validated['queue_type'] === 'walk-in' && !empty($validated['queue_number'])) {
-            $exists = Queue::where('queue_number', $validated['queue_number'])
-                ->whereIn('status', ['waiting', 'serving'])
-                ->exists();
+    // Manual number for walk-in
+    if ($validated['queue_type'] === 'walk-in' && !empty($validated['queue_number'])) {
+        // ✅ Only check ACTIVE statuses (waiting, serving)
+        $exists = Queue::where('queue_number', $validated['queue_number'])
+            ->whereIn('status', ['waiting', 'serving'])
+            ->exists();
 
-            if ($exists) {
-                return response()->json([
-                    'error' => 'QUEUE_NUMBER_ACTIVE',
-                    'message' => 'This queue number is already in use and has not been completed.'
-                ], 422);
-            }
-            $queueNumber = $validated['queue_number'];
-        } else {
-            $prefix = $validated['queue_type'] === 'appointment' ? 'A' : 'W';
-            $allNumbers = Queue::where('queue_number', 'like', "$prefix%")
-                ->pluck('queue_number')
-                ->toArray();
-
-            $i = 1;
-            do {
-                $queueNumber = $prefix . str_pad($i, 3, '0', STR_PAD_LEFT);
-                $i++;
-            } while (in_array($queueNumber, $allNumbers));
+        if ($exists) {
+            return response()->json([
+                'error' => 'QUEUE_NUMBER_ACTIVE',
+                'message' => 'This queue number is already in use and has not been completed.'
+            ], 422);
         }
 
-        $queue = Queue::create([
-            'queue_number' => $queueNumber,
-            'queue_type' => $validated['queue_type'],
-            'service_type' => $validated['service_type'],
-            'status' => 'waiting',
-        ]);
+        $queueNumber = $validated['queue_number'];
+    } else {
+        // Auto-generate number
+        $prefix = $validated['queue_type'] === 'appointment' ? 'A' : 'W';
 
-        return response()->json($queue, 201);
+        // ✅ Only fetch ACTIVE numbers (waiting, serving)
+        $activeNumbers = Queue::where('queue_number', 'like', "$prefix%")
+            ->whereIn('status', ['waiting', 'serving'])
+            ->pluck('queue_number')
+            ->toArray();
+
+        $i = 1;
+        do {
+            $queueNumber = $prefix . str_pad($i, 3, '0', STR_PAD_LEFT);
+            $i++;
+        } while (in_array($queueNumber, $activeNumbers));
     }
 
-    // Get next queue number
+    $queue = Queue::create([
+        'queue_number' => $queueNumber,
+        'queue_type' => $validated['queue_type'],
+        'service_type' => $validated['service_type'],
+        'status' => 'waiting',
+    ]);
+
+    // 🔥 EMIT SOCKET EVENT FOR NEW QUEUE
+    try {
+        Http::timeout(1)->post('http://localhost:3001/event', [
+            'type' => 'queue_added',
+            'queue' => [
+                'id' => $queue->id,
+                'queue_number' => $queue->queue_number,
+                'queue_type' => $queue->queue_type,
+                'service_type' => $queue->service_type,
+                'status' => $queue->status,
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        \Log::warning('Failed to emit queue_added event: ' . $e->getMessage());
+    }
+
+    return response()->json($queue, 201);
+}
+    // QueueController.php
     public function nextQueueNumber(Request $request)
     {
         $request->validate([
@@ -95,6 +95,8 @@ class QueueController extends Controller
         ]);
 
         $prefix = $request->queue_type === 'appointment' ? 'A' : 'W';
+
+        // Fetch all active numbers
         $existingNumbers = Queue::whereIn('status', ['waiting', 'serving'])
             ->pluck('queue_number')
             ->toArray();
@@ -108,20 +110,33 @@ class QueueController extends Controller
         return response()->json(['next_number' => $nextNumber]);
     }
 
-    // Cancel a queue
-    public function cancel($id)
-    {
-        $queue = Queue::find($id);
-        if (!$queue) {
-            return response()->json(['message' => 'Queue not found'], 404);
-        }
+  public function cancel($id)
+{
+    $queue = Queue::findOrFail($id);
+    $oldStatus = $queue->status;
 
-        $queue->update(['status' => 'cancelled']);
-        broadcast(new QueueCancelled($queue));
-        return response()->json(['message' => 'Queue cancelled', 'id' => $id]);
+    $queue->update(['status' => 'cancelled']);
+
+    // Emit socket event (optional)
+    try {
+        Http::timeout(1)->post('http://localhost:3001/event', [
+            'type' => 'queue_status_changed',
+            'queue_id' => $queue->id,
+            'queue_number' => $queue->queue_number,
+            'old_status' => $oldStatus,
+            'new_status' => 'cancelled',
+        ]);
+    } catch (\Throwable $e) {
+        \Log::warning('Failed to emit queue_status_changed event: ' . $e->getMessage());
     }
 
-    // List waiting queues
+    return response()->json([
+        'message' => 'Queue cancelled successfully',
+        'queue_id' => $queue->id
+    ]);
+}
+
+
     public function waiting()
     {
         return Queue::where('status', 'waiting')
@@ -129,155 +144,119 @@ class QueueController extends Controller
             ->get();
     }
 
-    // List appointment queues
     public function appointments()
     {
         return Queue::where('status', 'waiting')
-            ->where('queue_type', 'appointment')
+            ->where('queue_type', 'appointment') 
             ->orderBy('created_at', 'asc')
             ->get();
     }
 
-    // Call next queue
-public function callNext(Request $request)
-{
-    $request->validate([
-        'csoId' => 'required|exists:cso_staff,id',
-        'customerType' => 'required|in:walk-in,appointment',
-    ]);
+    public function callNext(Request $request)
+    {
+        $validated = $request->validate([
+            'csoId' => 'required|exists:cso_staff,id',
+            'customerType' => 'required|in:walk-in,appointment',
+        ]);
 
-    $cso = CSO::findOrFail($request->csoId);
+        $cso = CSO::findOrFail($validated['csoId']);
 
-    try {
-        /**
-         * 1️⃣ If CSO is already serving, COMPLETE it first
-         */
-        if ($cso->current_queue_id) {
-            $currentQueue = Queue::where('id', $cso->current_queue_id)
-                ->where('status', 'serving')
-                ->first();
+        // 1️⃣ Finish ONLY this CSO's current queue
+        Queue::where('cso_id', $cso->id)
+            ->where('status', 'serving')
+            ->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
 
-            if ($currentQueue) {
-                $currentQueue->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
-                ]);
-
-                // Clear CSO
-                $cso->update(['current_queue_id' => null]);
-
-                // Notify display (remove serving)
-                Http::post('http://localhost:3001/event', [
-                    'type' => 'service_completed',
-                    'counter_number' => $cso->counter_number,
-                ]);
-            }
-        }
-
-        /**
-         * 2️⃣ Get next waiting queue
-         */
-        $nextQueue = Queue::where('status', 'waiting')
-            ->where('queue_type', $request->customerType)
-            ->orderBy('created_at')
+        // 2️⃣ Get next waiting queue (GLOBAL waiting list)
+        $queue = Queue::where('status', 'waiting')
+            ->where('queue_type', $validated['customerType'])
+            ->orderBy('created_at', 'asc')
             ->first();
 
-        if (!$nextQueue) {
-            return response()->json([
-                'message' => 'No customers in queue',
-            ], 200);
+        if (!$queue) {
+            return response()->json(['message' => 'No customers in queue'], 404);
         }
 
-        /**
-         * 3️⃣ Assign new queue to CSO
-         */
-        $nextQueue->update([
+        // 3️⃣ Assign queue to THIS CSO ONLY
+        $queue->update([
             'status' => 'serving',
             'cso_id' => $cso->id,
             'called_at' => now(),
         ]);
 
-        $cso->update([
-            'current_queue_id' => $nextQueue->id,
+        // 4️⃣ Notify display (isolated by counter)
+        try {
+            Http::timeout(1)->post('http://localhost:3001/event', [
+                'type' => 'customer_called',
+                'counter_number' => $cso->counter_number,
+                'queue_number' => $queue->queue_number,
+                'queue_type' => $queue->queue_type,
+                'queue_id' => $queue->id,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to emit customer_called event: ' . $e->getMessage());
+        }
+
+        return response()->json($queue);
+    }
+
+    public function getCurrent($csoId)
+    {
+        $queue = Queue::where('status', 'serving')
+                      ->where('cso_id', $csoId)
+                      ->with('cso') // include CSO info
+                      ->first();
+
+        return response()->json($queue ?? null); // always return JSON, even if null
+    }
+
+    public function complete(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'duration' => 'required|integer|min:0',
         ]);
 
-        /**
-         * 4️⃣ Notify display (show new serving)
-         */
-        Http::post('http://localhost:3001/event', [
-            'type' => 'customer_called',
-            'counter_number' => $cso->counter_number,
-            'queue_number' => $nextQueue->queue_number,
-            'queue_type' => $nextQueue->queue_type,
+        $queue = Queue::with('cso')->findOrFail($id);
+
+        // 1️⃣ Mark queue completed
+        $queue->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'service_duration' => $validated['duration'],
         ]);
+
+        // 2️⃣ CLEAR CSO CURRENT QUEUE
+        if ($queue->cso) {
+            $queue->cso->update([
+                'current_queue_id' => null,
+            ]);
+        }
+
+        // 3️⃣ Notify display
+        try {
+            Http::timeout(1)->post('http://localhost:3001/event', [
+                'type' => 'service_completed',
+                'counter_number' => optional($queue->cso)->counter_number,
+                'queue_id' => $queue->id,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::warning('Failed to emit service_completed event: ' . $e->getMessage());
+        }
 
         return response()->json([
-            'message' => 'Next customer called',
-            'queue' => $nextQueue,
-        ], 200);
-
-    } catch (\Throwable $e) {
-        return response()->json([
-            'message' => 'Failed to call next customer',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
-
-
-
-
-
-    // Complete a queue
- public function complete(Request $request, $id)
-{
-    $validated = $request->validate([
-        'duration' => 'required|integer|min:0',
-    ]);
-
-    $queue = Queue::with('cso')->findOrFail($id);
-
-    // 1️⃣ Mark queue completed
-    $queue->update([
-        'status' => 'completed',
-        'completed_at' => now(),
-        'service_duration' => $validated['duration'],
-    ]);
-
-    // 2️⃣ CLEAR CSO CURRENT QUEUE
-    if ($queue->cso) {
-        $queue->cso->update([
-            'current_queue_id' => null,
+            'message' => 'Service completed',
+            'queue' => $queue,
         ]);
     }
 
-    // 3️⃣ Notify display
-    try {
-        Http::post('http://localhost:3001/event', [
-            'type' => 'service_completed',
-            'counter_number' => optional($queue->cso)->counter_number,
-        ]);
-    } catch (\Throwable $e) {
-        \Log::error('Failed to send completion event: ' . $e->getMessage());
+    public function currentForCso($csoId)
+    {
+        $queue = Queue::where('status', 'serving')
+              ->where('cso_id', $csoId)
+              ->first();
+
+        return response()->json($queue);    
     }
-
-    return response()->json([
-        'message' => 'Service completed',
-        'queue' => $queue,
-    ]);
-}
-
-
-    // Get current queue for CSO
- public function currentForCso($csoId)
-{
-    $queue = Queue::where('cso_id', $csoId)
-        ->where('status', 'serving')
-        ->first();
-
-    return response()->json($queue);
-}
-
-
-
 }
