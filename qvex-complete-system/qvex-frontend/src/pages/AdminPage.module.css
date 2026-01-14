@@ -186,3 +186,23 @@
 .saveBtn:hover {
   background: var(--success-light);
 }
+
+
+.statsBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #2dd4bf 0%, #06b6d4 100%);
+  border: none;
+  border-radius: 12px;
+  color: #0a0e27;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.statsBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(45, 212, 191, 0.3);
+}

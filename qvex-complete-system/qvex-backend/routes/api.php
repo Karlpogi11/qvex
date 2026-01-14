@@ -25,6 +25,7 @@ Route::prefix('csos')->group(function () {
     Route::delete('/{id}', [CSOController::class, 'destroy']); // ✅ ADD THIS for deleting CSO
     Route::patch('/{id}/status', [CSOController::class, 'updateStatus']);
     Route::get('/{id}/current-queue', [CSOController::class, 'getCurrent']);
+    
 });
 
 // ✅ ADD SETTINGS ROUTES

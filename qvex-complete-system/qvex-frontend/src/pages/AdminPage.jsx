@@ -5,8 +5,14 @@ import { ArrowLeft, Plus, X, Save } from 'lucide-react';
 import { useAppStore } from '../store';
 import { csoApi, settingsApi } from '../services/api';
 import styles from './AdminPage.module.css';
+import { BarChart3 } from 'lucide-react';
 
 const AdminPage = () => {
+
+
+
+
+  
   const navigate = useNavigate();
   const { theme, setTheme, settings, updateSettings, addNotification } = useAppStore();
   const [csos, setCsos] = useState([]);
@@ -82,6 +88,8 @@ const handleSaveSettings = async () => {
 };
 
   return (
+
+    
     <div className={styles.container}>
       <div className={styles.header}>
         <button className={styles.backBtn} onClick={() => navigate('/')}>
@@ -90,6 +98,8 @@ const handleSaveSettings = async () => {
         </button>
         <h1>Settings & Configuration</h1>
       </div>
+
+
 
       <div className={styles.content}>
         {/* Theme Settings */}
@@ -108,9 +118,22 @@ const handleSaveSettings = async () => {
             >
               Light Mode
             </button>
+
+
+            
           </div>
+
+
+          
         </div>
 
+      <button 
+        className={styles.statsBtn}
+        onClick={() => navigate('/statistics')}
+      >
+        <BarChart3 size={20} />
+        View Statistics
+      </button>
         {/* CSO Management */}
         <div className={styles.section}>
           <h2>Customer Service Officers</h2>
@@ -126,6 +149,8 @@ const handleSaveSettings = async () => {
               <Plus size={20} />
               Add CSO
             </button>
+
+            
           </div>
           <div className={styles.itemList}>
             {csos.map((cso) => (
@@ -141,6 +166,9 @@ const handleSaveSettings = async () => {
             ))}
           </div>
         </div>
+
+
+
 
         {/* Service Types */}
         <div className={styles.section}>

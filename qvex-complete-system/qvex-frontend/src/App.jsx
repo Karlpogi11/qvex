@@ -8,6 +8,7 @@ import DisplayPage from './pages/DisplayPage';
 import AdminPage from './pages/AdminPage';
 import NotificationContainer from './components/common/NotificationContainer';
 import './styles/global.css';
+import StatisticsPage from './pages/StatisticsPage';
 
 
 
@@ -32,6 +33,7 @@ function App() {
           <Route path="/cso/:csoId" element={<CsoPage />} />
           <Route path="/display" element={<DisplayPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/statistics" element={<StatisticsPage onBack={() => navigate('/admin')} />} />
         </Routes>
         <NotificationContainer />
       </div>

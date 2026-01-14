@@ -13,35 +13,36 @@ class StatisticsController extends Controller
     /**
      * Get daily statistics
      */
-    public function getDaily()
+    public function getDaily(Request $request)
     {
-        $today = Carbon::today();
+        $startDate = $request->input('start_date', Carbon::today()->format('Y-m-d'));
+        $endDate = $request->input('end_date', Carbon::today()->format('Y-m-d'));
 
         $stats = [
-            'total_queues' => Queue::whereDate('created_at', $today)->count(),
-            'completed' => Queue::whereDate('created_at', $today)
+            'total_queues' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])->count(),
+            'completed' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
                 ->where('status', 'completed')
                 ->count(),
-            'cancelled' => Queue::whereDate('created_at', $today)
+            'cancelled' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
                 ->where('status', 'cancelled')
                 ->count(),
             'waiting' => Queue::where('status', 'waiting')->count(),
             'serving' => Queue::where('status', 'serving')->count(),
             
-            'walk_in' => Queue::whereDate('created_at', $today)
+            'walk_in' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
                 ->where('queue_type', 'walk-in')
                 ->count(),
-            'appointment' => Queue::whereDate('created_at', $today)
+            'appointment' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
                 ->where('queue_type', 'appointment')
                 ->count(),
             
-            'average_service_time' => Queue::whereDate('created_at', $today)
+            'average_service_time' => Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
                 ->where('status', 'completed')
                 ->whereNotNull('service_duration')
                 ->avg('service_duration'),
             
-            'hourly_breakdown' => $this->getHourlyBreakdown($today),
-            'service_type_breakdown' => $this->getServiceTypeBreakdown($today),
+            'hourly_breakdown' => $this->getHourlyBreakdown($startDate, $endDate),
+            'service_type_breakdown' => $this->getServiceTypeBreakdown($startDate, $endDate),
         ];
 
         return response()->json($stats);
@@ -189,11 +190,11 @@ class StatisticsController extends Controller
     }
 
     /**
-     * Get hourly breakdown for a specific date
+     * Get hourly breakdown for a specific date range
      */
-    private function getHourlyBreakdown($date)
+    private function getHourlyBreakdown($startDate, $endDate)
     {
-        return Queue::whereDate('created_at', $date)
+        return Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
             ->select(
                 DB::raw('HOUR(created_at) as hour'),
                 DB::raw('count(*) as total'),
@@ -206,11 +207,11 @@ class StatisticsController extends Controller
     }
 
     /**
-     * Get service type breakdown for a specific date
+     * Get service type breakdown for a specific date range
      */
-    private function getServiceTypeBreakdown($date)
+    private function getServiceTypeBreakdown($startDate, $endDate)
     {
-        return Queue::whereDate('created_at', $date)
+        return Queue::whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
             ->select(
                 'service_type',
                 DB::raw('count(*) as total'),
@@ -224,24 +225,25 @@ class StatisticsController extends Controller
     /**
      * Get performance comparison between all CSOs
      */
-    public function getCsoComparison()
+    public function getCsoComparison(Request $request)
     {
-        $today = Carbon::today();
+        $startDate = $request->input('start_date', Carbon::today()->format('Y-m-d'));
+        $endDate = $request->input('end_date', Carbon::today()->format('Y-m-d'));
 
-        $csos = CSO::with(['queues' => function ($query) use ($today) {
-            $query->whereDate('created_at', $today)
-                  ->where('status', 'completed');
-        }])
-        ->where('is_active', true)
-        ->get()
-        ->map(function ($cso) {
+        $csos = CSO::where('is_active', true)->get()->map(function ($cso) use ($startDate, $endDate) {
+            $queues = Queue::where('cso_id', $cso->id)
+                ->whereBetween('created_at', [$startDate, $endDate . ' 23:59:59'])
+                ->where('status', 'completed')
+                ->get();
+
             return [
                 'id' => $cso->id,
                 'name' => $cso->name,
+                'cso_name' => $cso->cso_name ?? $cso->name,
                 'counter_number' => $cso->counter_number,
-                'total_served' => $cso->queues->count(),
-                'average_service_time' => $cso->queues->avg('service_duration'),
-                'total_service_time' => $cso->queues->sum('service_duration'),
+                'total_served' => $queues->count(),
+                'average_service_time' => $queues->avg('service_duration'),
+                'total_service_time' => $queues->sum('service_duration'),
             ];
         });
 
