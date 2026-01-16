@@ -154,19 +154,35 @@ class StatisticsController extends Controller
     {
         $today = Carbon::today();
 
-        // Calculate average wait time (time between created_at and called_at)
+        // Calculate average wait time (time between created_at and called_at OR completed_at)
         $queues = Queue::whereDate('created_at', $today)
             ->where('status', 'completed')
-            ->whereNotNull('called_at')
             ->get();
 
         $totalWaitTime = 0;
         $count = 0;
 
         foreach ($queues as $queue) {
-            $waitTime = Carbon::parse($queue->called_at)->diffInSeconds(Carbon::parse($queue->created_at));
-            $totalWaitTime += $waitTime;
-            $count++;
+            // Use called_at if available, otherwise use completed_at
+            $calledTime = $queue->called_at ?? $queue->completed_at;
+            
+            if ($calledTime) {
+                $waitTime = Carbon::parse($calledTime)->diffInSeconds(Carbon::parse($queue->created_at));
+                
+                // Subtract service_duration if we're using completed_at
+                if (!$queue->called_at && $queue->service_duration) {
+                    $waitTime = max(0, $waitTime - $queue->service_duration);
+                }
+                
+                // ✅ Skip if wait time is negative or more than 2 hours (7200 seconds)
+                // This filters out overnight queues and data errors
+                if ($waitTime < 0 || $waitTime > 7200) {
+                    continue;
+                }
+                
+                $totalWaitTime += $waitTime;
+                $count++;
+            }
         }
 
         $averageWaitTime = $count > 0 ? round($totalWaitTime / $count) : 0;

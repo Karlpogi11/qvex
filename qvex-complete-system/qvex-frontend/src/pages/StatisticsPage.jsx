@@ -42,8 +42,11 @@ const StatisticsPage = ({ onBack }) => {
         csoCompRes.json()
       ]);
 
+      console.log('Wait Time Data:', waitTimeData); // Debug log
+
       setStats({
         ...dailyData,
+        average_wait_time: waitTimeData.average_wait_time || 0,
         wait_time: waitTimeData
       });
       setCsoStats(csoCompData);
@@ -242,7 +245,7 @@ const StatisticsPage = ({ onBack }) => {
           </div>
           <div className={styles.statContent}>
             <div className={styles.statValue}>
-              {formatDuration(stats?.wait_time?.average_wait_time)}
+              {formatDuration(stats?.average_wait_time || 0)}
             </div>
             <div className={styles.statLabel}>Avg Wait Time</div>
           </div>

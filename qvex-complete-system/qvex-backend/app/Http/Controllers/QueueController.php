@@ -153,54 +153,54 @@ class QueueController extends Controller
     }
 
     public function callNext(Request $request)
-    {
-        $validated = $request->validate([
-            'csoId' => 'required|exists:cso_staff,id',
-            'customerType' => 'required|in:walk-in,appointment',
+{
+    $validated = $request->validate([
+        'csoId' => 'required|exists:cso_staff,id',
+        'customerType' => 'required|in:walk-in,appointment',
+    ]);
+
+    $cso = CSO::findOrFail($validated['csoId']);
+
+    // 1️⃣ Finish ONLY this CSO's current queue
+    Queue::where('cso_id', $cso->id)
+        ->where('status', 'serving')
+        ->update([
+            'status' => 'completed',
+            'completed_at' => now(),
         ]);
 
-        $cso = CSO::findOrFail($validated['csoId']);
+    // 2️⃣ Get next waiting queue (GLOBAL waiting list)
+    $queue = Queue::where('status', 'waiting')
+        ->where('queue_type', $validated['customerType'])
+        ->orderBy('created_at', 'asc')
+        ->first();
 
-        // 1️⃣ Finish ONLY this CSO's current queue
-        Queue::where('cso_id', $cso->id)
-            ->where('status', 'serving')
-            ->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-            ]);
-
-        // 2️⃣ Get next waiting queue (GLOBAL waiting list)
-        $queue = Queue::where('status', 'waiting')
-            ->where('queue_type', $validated['customerType'])
-            ->orderBy('created_at', 'asc')
-            ->first();
-
-        if (!$queue) {
-            return response()->json(['message' => 'No customers in queue'], 404);
-        }
-
-        // 3️⃣ Assign queue to THIS CSO ONLY
-        $queue->update([
-            'status' => 'serving',
-            'cso_id' => $cso->id,
-            'called_at' => now(),
-        ]);
-
-        // 4️⃣ Notify display (isolated by counter)
-        try {
-            Http::timeout(1)->post('http://localhost:3001/event', [
-                'type' => 'customer_called',
-                'counter_number' => $cso->counter_number,
-                'queue_number' => $queue->queue_number,
-                'queue_type' => $queue->queue_type,
-                'queue_id' => $queue->id,
-            ]);
-        } catch (\Throwable $e) {
-            \Log::warning('Failed to emit customer_called event: ' . $e->getMessage());
-        }
-
-        return response()->json($queue);
+    if (!$queue) {
+        return response()->json(['message' => 'No customers in queue'], 404);
     }
+
+    // 3️⃣ Assign queue to THIS CSO ONLY and SET called_at ✅
+    $queue->update([
+        'status' => 'serving',
+        'cso_id' => $cso->id,
+        'called_at' => now(), 
+    ]);
+
+    // 4️⃣ Notify display (isolated by counter)
+    try {
+        Http::timeout(1)->post('http://localhost:3001/event', [
+            'type' => 'customer_called',
+            'counter_number' => $cso->counter_number,
+            'queue_number' => $queue->queue_number,
+            'queue_type' => $queue->queue_type,
+            'queue_id' => $queue->id,
+        ]);
+    } catch (\Throwable $e) {
+        \Log::warning('Failed to emit customer_called event: ' . $e->getMessage());
+    }
+
+    return response()->json($queue);
+}
 
     public function getCurrent($csoId)
     {

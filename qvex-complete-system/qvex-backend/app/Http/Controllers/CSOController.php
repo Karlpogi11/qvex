@@ -70,19 +70,37 @@ $csos = $csos->map(function($cso) {
 }
 
 
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|unique:cso_staff,name',
-            'counter_number' => 'required|integer',
-        ]);
+  public function store(Request $request)
+{
+    $validated = $request->validate([
+        'name' => 'required|string',
+        'counter_number' => 'required|integer',
+    ]);
 
-        $validated['is_active'] = true;
+    // Check if CSO exists but is inactive
+    $existingCso = CSO::where('name', $validated['name'])->first();
 
-        $cso = CSO::create($validated);
-        return response()->json($cso, 201);
+    if ($existingCso) {
+        if (!$existingCso->is_active) {
+            // Reactivate the existing CSO
+            $existingCso->update([
+                'is_active' => true,
+                'counter_number' => $validated['counter_number']
+            ]);
+            return response()->json($existingCso, 200);
+        } else {
+            // CSO is already active
+            return response()->json([
+                'message' => 'CSO with this name already exists'
+            ], 422);
+        }
     }
 
+    // Create new CSO
+    $validated['is_active'] = true;
+    $cso = CSO::create($validated);
+    return response()->json($cso, 201);
+}
 
 
       public function getCurrent($csoId)

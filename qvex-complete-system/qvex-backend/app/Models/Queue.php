@@ -15,6 +15,7 @@ class Queue extends Model
     'queue_type',
     'service_type',
     'status',
+    'called_at',   
     'cso_id',
     'queued_at',
     'completed_at',

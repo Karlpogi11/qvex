@@ -88,8 +88,6 @@ const handleSaveSettings = async () => {
 };
 
   return (
-
-    
     <div className={styles.container}>
       <div className={styles.header}>
         <button className={styles.backBtn} onClick={() => navigate('/')}>
@@ -103,6 +101,8 @@ const handleSaveSettings = async () => {
 
       <div className={styles.content}>
         Theme Settings
+
+        {/* ?\Hindi pa naayos contrast */}
         {/* <div className={styles.section}>
           <h2>Appearance</h2>
           <div className={styles.themeToggle}>
